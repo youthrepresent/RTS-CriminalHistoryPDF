@@ -1,0 +1,212 @@
+@isTest
+public class CrimHistoryPDF_Test {
+static testMethod void ClickCHreviewbutton (){
+    
+        Test.startTest();
+   
+        //stage data
+       //contact
+       Contact Cont = new Contact();
+           Cont.FirstName= 'RTSTestme';
+           Cont.LastName='RTSClient0';
+           Cont.Nysid__c='234567Z';
+            
+           insert Cont;
+    
+    
+    	Profile profileId = [SELECT Id FROM Profile WHERE Name = 'Standard User' LIMIT 1];
+		User usr = new User(LastName = 'Labs',
+                   FirstName='RTS',
+                   Alias = 'rtsbs',
+                   Email = 'rtsUser@testrtslbs.com',
+                   Username = 'rtsUser@testrtslbs.com',
+                   ProfileId = profileId.id,
+                   TimeZoneSidKey = 'GMT',
+                   LanguageLocaleKey = 'en_US',
+                   EmailEncodingKey = 'UTF-8',
+                   LocaleSidKey = 'en_US'
+                   );
+
+       	    try{
+    	insert usr;
+    }catch(exception e)
+    {
+        system.debug('inserting user error: ' + e.getMessage() + '  cause: ' + e.getCause());
+    }
+       //request
+       Request__c Req = new Request__c();
+            Req.Client__c = Cont.Id;
+            Req.RecordTypeId= '012A0000000NUBm';
+            Req.Service_Area__c = 'Records';
+            insert Req;
+       
+       //service
+       Service__c Serv = new Service__c();
+            Serv.Client__c = Cont.Id;
+    		Serv.Service_Area__c = 'Records';
+    		Serv.Assigned_To__c = usr.Id;
+            Serv.RecordTypeId= '012A0000000NUBrIAO';
+            Serv.Request__c = Req.Id;
+            Serv.Plea_Charge__c='PleaCharge';
+            
+    	try{
+        	insert Serv;
+        }
+    	catch(exception e)
+        {
+            system.debug('Error: ' + e.getMessage());
+        }
+       //charge
+       Charge__c Chrg = new Charge__c();
+            Chrg.Name='111.50';
+            
+            insert Chrg;
+       
+       //cj cycle
+       CJ_Cycle__c CJ = new CJ_Cycle__c();
+            CJ.Service__c= serv.Id;
+            CJ.Cycle__c = 1;
+            CJ.this_case_is__c='an unsealed violation'; 
+            CJ.notes__c = 'Main notes field'; 
+            CJ.missing_unclear_dispositions__c='Yes';
+            CJ.disposition_note__c='Disposition Notes field';
+            CJ.court_house__c='Kings County, 120 Shermerhorn Street';
+            CJ.warrant__c='No';
+            CJ.warrant_notes__c='Warrant Notes field';
+            CJ.certificate_eligibility_client_text__c='You are eligible for a Certificate of Good Conduct'; 
+            CJ.certificate_notes__c='Certificate Notes field';
+            CJ.Will_be_sealed__c='Unknown';
+            CJ.type__c='Not Sealed';
+            
+            insert CJ;
+            
+            //get reference of printable page
+            PageReference pageRef = new PageReference('/apex/ServiceGeneratePDF?id=' +Serv.Id);
+            Test.setCurrentPage(pageRef);
+            
+            //instantiate controller
+            CrimHistoryPDF_Ctrlr controller = new CrimHistoryPDF_Ctrlr();
+            
+            //call methods
+            controller.getName();
+            controller.getServiceInfo();
+      		controller.getPublicSummaryString();
+  			controller.getPrivateSummaryString();
+            controller.getWarrants();
+            controller.getCertificates();
+            controller.getErrors();
+        	controller.getSemiPublicSummaryString();
+    		controller.getReportDate();
+    		controller.getClientInitials();
+    		
+    		controller.getCertificates();
+    		controller.getPublicCases();
+    		controller.getPrivateCases();
+    		controller.getPartialPublicCases();
+    		controller.getNextCourtDates();
+    
+/*    
+    list<Contact> lstContact = new list<Contact>{};
+    contact a;
+    for(integer i=0; i < 20; i++){
+        a = new Contact();
+        a.FirstName= 'Testme';
+        a.LastName='TestClient0' + i;
+        a.Nysid__c=i+'234567Z';
+//        a.Recordtypeid='012A0000000EcmG';
+        lstContact.add(a);
+    }
+//    Test.starttest();
+        insert lstContact;
+//    Test.stoptest();
+ 
+     system.debug('\n\nContact List: ' + lstContact);
+
+    // get contact id for service 
+    //List<Contact> insertedContacts = [select Name, ID 
+    //                  from contact
+    //                  where ID in :contacts];
+    
+    // Do I need to create Request first? Service is detail on M/D relationship to Request
+    
+    list<Request__c> lstRequests = new list<Request__c>{};
+    Request__c req;
+    for(integer i=0; i < 20; i++){
+        req = new Request__c();
+        req.Client__c = lstContact[i].Id;
+        req.RecordTypeId= '012A0000000NUBm';
+        lstRequests.add(req);
+    }
+//    Test.starttest();
+        insert lstRequests;
+//    Test.stoptest();      
+     system.debug('\n\nRequest List: ' + lstRequests);
+
+ 
+    // create service, how to link one to each contact? Do I need RecordTypeID? 
+    list<Service__c> lstServices = new list<Service__c>{};
+    Service__c serv;
+    for(integer i=0; i < 20; i++){
+        // Service__c and cj_cycle name is auto incremental field
+        serv = new Service__c();
+        serv.Client__c = lstContact[i].Id;
+        serv.RecordTypeId= '012A0000000NUBr';
+        serv.Request__c = lstRequests[i].id;
+        serv.Plea_Charge__c='PleaCharge';
+        lstServices.add(serv);
+    }
+ //   Test.starttest();
+        insert lstServices;
+ //   Test.stoptest();    
+
+     system.debug('**SD** \n\nService List: ' + lstServices);
+
+// insert charge
+//    list<Charge__c> lstCharges = new list<Charge__c>{};
+//    charge__c chg;
+//    chg.Name='666.50';
+//    chg.Recordtypeid='012A0000000FXZc';
+//    chg.charge_Class__c='A';
+//    chg.charge_degree__c='1';
+//    chg.Charge_Level__c='F';
+//    chg.charge_description__c='test charge';
+//    lstCharges.add(chg);
+//   Test.starttest();
+//        insert lstCharges;
+ //   Test.stoptest();    
+//     system.debug('**CHG** \n\nCharge List: ' + lstCharges);
+
+    // create cj cycles, how to link THREE to each contact? How to set field values?
+    // 4 scenarios: 1. both sealed and unsealed; 2. at least one sealed and zero unsealed; 3. zero sealed and at least one sealed; 4. none at all
+    list<CJ_Cycle__c> lstCycles= new list<CJ_Cycle__c>{};  
+    for(integer i=0; i < 10; i++){
+        CJ_Cycle__c cj;
+        cj = new CJ_Cycle__c();
+        cj.Service__c= lstServices[i].id;
+        cj.Cycle__c = i;
+        cj.this_case_is__c='a criminal conviction, sentence pending'; 
+        //cj.disposition_date__c=systemdate() adddays.90 ;
+        //cj.will_be_sealed_on__c=systemdate() adddays.360; 
+        cj.notes__c = 'Main notes field'; 
+        cj.missing_unclear_dispositions__c='Yes';
+        cj.disposition_note__c='Disposition Notes field';
+        cj.court_house__c='Kings County, 120 Shermerhorn Street';
+        cj.warrant__c='No';
+        cj.warrant_notes__c='Warrant Notes field';
+        cj.certificate_eligibility_client_text__c='You are eligible for a Certificate of Good Conduct'; 
+        cj.certificate_notes__c='Certificate Notes field';
+        // CASE 1. if i is even make sealed, otherwise make not sealed
+        cj.type__c='Not Sealed';
+        lstCycles.add(cj);
+    }
+ //   Test.starttest();
+        insert lstCycles;
+//    Test.stoptest();            
+     system.debug('\n\nCJ_Cycles List: ' + lstCycles);
+
+// okay, how do I test clicking on the button on the Service page layout?
+*/
+
+        Test.stopTest();
+    }
+}

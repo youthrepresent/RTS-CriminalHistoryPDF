@@ -1,0 +1,547 @@
+/********************************************************************************************
+* 	@Author:	Darryl M. Ingalls
+* 	@Date:		05/21/2018
+* 	Purpose:	This class was replicated from the CrimHistReview class. It is
+* 				being replicated and not extended to allow the old code path
+* 				to still be executed if it becomes necessary.  This class does
+*				not extend also because the base queries will be changed a bit
+*				to pull back the just the necessary information for each type
+*				of Cycle/Case section.
+*		
+*				This class provides the criminal history of a client which includes;
+*				Service, public/semi-public/private cases/cj,etc.  This information 
+* 				will be made available to the mark-up class. 
+*				
+*				New information will be pulled from the relatives sources and returned
+*				to help support the new PDF design.
+*	
+* 
+*	@Notes: 	Changed the function getSealedCycle to    getPrivateCases
+*				Changed the function getNotSealedCycle to getPublicCases
+*				Changed the function getNotSealedCycle to getPublicCases
+*				
+*				I performed Proper scoping of some of the original functions that were silly and unnecessarily 
+*				public out of laziness.  I corrected the ones that I dealt directly with.
+*	
+*	05/24/2018	DMI in order to make the summaries for cases on the PDF seem more natural we have created
+*				a lookup map for plural conversions of the description.  This will be used for summary 
+*				descriptions that have more than one case.  The map is called Map<String,String> pluralLookupsCaseDescription
+*				the map key's come from the CJ_CYCLE__c's this_case_is__c .  the values part of the map
+*    			represent the plural version of the descriptions.  NOTE:  If a new value is ever added to
+*    			the fields pick list we must add a lookup and conversion in this map.
+*	09/04/2018	DMI updated some code to prevent SOQL Injection.  Took out the need for recID() and stopped using dynamic queries
+*				updated function retrieveSummaryRecords( String viewabilityWhereClause) and changed parameter type to
+*				ENUM Summary_Case_Types caseType.  
+*				Updated any functions to call this function with the correct data type and parameter.
+*				Changed AttorneyInfo property to attorneyInfo and updated the VFP as well to reflect change.
+*
+* 
+* */
+
+
+public with sharing class CrimHistoryPDF_Ctrlr {
+    string svcRecID = null;  //global reference for svc rec id
+    enum Summary_Case_Types {TYPE_PUBLIC, TYPE_SEMIPUBLIC, TYPE_PRIVATE }
+    
+  /*  static final String PDF_SUMMARY_ORDER_CLAUSE  = ' order by this_case_is__c, cycle__c ';
+    static final String PDF_SUMMARY_PUBLIC_WHERE_CLAUSE = '\' and type__c= \'Not Sealed\' and this_case_is__c!= \'an unsealed violation\' ' +
+        'and this_case_is__c!= \'an arrest only\'';
+    static final String PDF_SUMMARY_PRIVATE_WHERE_CLAUSE = '\' and type__c=\'Sealed\'';
+    static final String PDF_SUMMARY_SEMIPUBLIC_WHERE_CLAUSE = '\' and type__c= \'Not Sealed\' ' +
+        ' and (this_case_is__c=\'an unsealed violation\' ' +
+        ' or this_case_is__c=\'an arrest only\')';
+    static final String PDF_SUMMARY_BASE_SOQL = 'SELECT  service__c, Certificate_Eligibility_Client_Text__c, this_case_is__c ,cycle__c, notes__c from cj_cycle__c WHERE this_case_is__c != null ' +
+        ' AND service__c = \'';*/
+    static final List<String> EXCLUDES = new List<String> {'a ','an '};
+  	static final String OPEN_CASE = 'an open case';
+    static final String NO_SUMMARY_AVAILABLE = 'No Summary Available';
+    static final String NO_PUBLIC_CASES = 'You have no public cases.';
+    static final String NO_SEMI_CASES = 'You have no semi-public cases.';
+    static final String NO_PRIVATE_CASES = 'You have no private cases.';
+    static final String NO_OPEN_CASES = 'No Open Cases';
+    static final string ELIGIBLE_CERTIFICATE = 'You are eligible for a Certificate of Relief';
+        
+    //DMI the map key's come from the CJ_CYCLE__c's this_case_is__c .  the values part of the map
+    //represent the plural version of the descriptions.  NOTE:  If a new value is ever added to
+    //the fields pick list we must add a lookup and conversion in this map.
+    static final Map<String,String> PLURALLOOKUPSCASEDESCRIPTION = new Map<String,String> {
+            'criminal conviction' => 'criminal convictions',
+           	'criminal conviction, sentence pending' => 'criminal convictions, sentence pending',
+            'juvenile delinquency adjudication' => 'juvenile delinquency adjudications',
+            'adjournment in contemplation of dismissal (ACD)' => 'adjournments in contemplation of dismissal (ACD)',
+            'open case' => 'open cases',
+            'unsealed violation' => 'unsealed violations',
+            'sealed violation conviction' => 'sealed violation convictions',
+            'youthful offender adjudication' => 'youthful offender adjudications',
+            'dismissed and sealed' => 'dismissed and sealed',
+            'arrest only' => 'arrests only',
+            'covered by another case' => 'covered by another case',
+            'sealed case in Family Court' => 'sealed cases in Family Court'
+        } ;  
+            
+        public CrimHistoryPDF_Ctrlr   ()
+        {
+            svcRecID =  ApexPages.currentPage().getParameters().get('id');
+            //svcRecID = recordID();  //call svc rec id function so as to obtain svc rec id
+        	system.debug('**QC0327** \n\nService id from constructor: ' +svcRecID);    
+            List<service__c> tmpServices = [select id, name, nysid__c,client_display_name__c, report_date__c, reporting_agency_used__c
+                from service__c where ID = :svcRecID Limit 1];
+            
+            if (0 < tmpServices.size())
+            {
+                service = tmpServices[0];
+            }
+            
+            attorneyInfo = retrieveAttorneyInfo();
+            allOpenCaseNotes = new List<CJ_Cycle__c>();
+            eligibleCertificateCases = new List<integer>();
+            
+        }
+    
+    	//DMI 09/04/2018  Took these functions out, these were made obsolete when they changed the requirement from having
+    	//the cases display as one string versus a list of cases on the PDF.
+    	//
+      /*	public String openPublicCases
+        {
+            get{ return( (String.isNotBlank(openPublicCases)) ? openPublicCases : 'No Open Public Cases'); }
+    		set;
+        }
+ 
+    	public String openPrivateCases
+        {
+            get { return( (String.isNotBlank(openPrivateCases)) ? openPrivateCases : 'No Open Private Cases'); } set;
+        }
+    
+    	public String OpenSemiPublicCases
+        {
+            get{return( (String.isNotBlank(openSemiPublicCases)) ? openSemiPublicCases : 'No Open Semi-Public Cases');}
+            set;
+        }*/
+    
+    	public User attorneyInfo
+        {
+            get;set;
+        }
+    
+    	public List<CJ_Cycle__c> allOpenCaseNotes
+        {
+            get;set;
+        }
+    
+    	public List<integer> eligibleCertificateCases
+        {
+            get;set;
+        }
+    
+	    //Not sure this is necessary and or needed
+        public String getName(){
+            return 'CrimHistoryPDF_Ctrlr' ;
+        }
+    
+    	private Service__c service = null;
+   /* ***********************************************************************************
+    * @Author:		Darryl Ingalls
+    * @Date:		05/22/2018
+    * @Param:		None
+    * @Return:		String - the service__c Id that is used to load the PDF.  This could be
+    * 				a return type of ID but string to ID conversion will happen so it's not
+    * 				totally necessary.
+    *
+    *			Note: function to determine svc rec id
+    *			This was carry over code from the original CrimHistReview and I'm not
+    *			sure why this scoped as public.   I don't see it being used outside of the
+    *			class.  I'll leave it alone for now until I can decide if it should be private.
+    *			I also optimized this up a bit to get rid of the unnecessary code/statements.
+    * ******************************************************************************************/
+   /* Public string recordID(){
+         
+        return(ApexPages.currentPage().getParameters().get('id'));
+        
+    }*/
+    
+   /* **************************************************************************
+    * @Author:		Darryl Ingalls
+    * @Date:		05/22/2018
+    * @Parameter:	None
+    * @Return:		User object that is retrieved from the 
+    * 				Assigned_To__c field in the service__c object.
+    * 				This is supposed to represent the attorney Info
+    * 				That will be used in the header of the PDF.
+    * 				
+    * 				The User Object will be formed with the following
+    * 				Fields:
+    * 					Id
+    * 					Name
+    * 					Phone
+    * 					Email
+    * 
+    * 	The Soql can be formed like [SELECT Id, Assigned_To__r.Name,
+    * 								 Assigned_To__r.Email,
+    * 								 Assigned_To__r.Phone From Service
+    * 								 WHERE Service__c = recordID()]
+    * 
+    * 	but I want the mark up to access the User object directly without
+    * 	having to go through the service__c.Assigned_To__r.Phone.
+    * 
+    *  I usually like to do return wrapper classes instead of returning the raw
+    *  object.  This is good for cases when no values are returned from SOQL
+    *  I can fill the return class with default/error strings for each member
+    * 	instead of making the mark up look and test for null.  It gives a smoother
+    *  front end experience.  But for the sake of speed and minimal effort 
+    * 	we won't do that.
+    * *************************************************************************/
+    private User retrieveAttorneyInfo()
+    {
+        return([SELECT Id, Name, Email, Phone FROM User 
+                WHERE Id IN (SELECT Assigned_To__c FROM Service__c WHERE Id =: svcRecID) Limit 1]);
+    }
+    
+    
+   /* *****************************************************************************************
+    * @Author:		Darryl Ingalls
+    * @Date:		05/23/2018
+    * @Param:		None
+    * @Return:		List<String>
+    * @Updated:		Natalie changed the code to return list of case strings as the requirement
+    * 				from having them display on one line changed to displaying them as bullet items.
+    * *****************************************************************************************/
+    public List<String> getPublicSummaryString()
+    {
+        system.debug('PublicSummaryString');
+        Map<String,List<integer>> summaryRecords = retrieveSummaryRecords(Summary_Case_Types.TYPE_PUBLIC);
+        if (0 < summaryRecords.size()){
+       		Map<String, List<Integer>> openRecords = createMapForOpenCases(summaryRecords);
+        	//build the 2nd line open cases only.  PRD 2.a.ii
+			//OpenPublicCases = buildSummaryString(openRecords).replace(NO_SUMMARY_AVAILABLE,NO_OPEN_CASES); 
+        }
+        List<String> results = buildSummaryString(summaryRecords);
+        if (results.size() < 1) results.add(NO_PUBLIC_CASES);
+        
+		//return the summary string  PRD 2.a.i        
+        return(results);
+    }
+    
+    
+    public String getClientInitials()
+    {
+        String retVal = '';
+        if (null != service)
+        {
+            String name = service.Client_Display_Name__c;
+            system.debug('Name: ' + name);
+            List<string> names = name.split(' ');
+            if (0 < names.size())
+            {
+                retVal  = names[0].substring(0,1) + '.' + names[1].substring(0,1) + '.';
+                System.debug('Initials: ' + retVal);
+                
+            }
+        }
+        return(retVal);
+    }
+    
+    public Date getReportDate()
+    {
+        Date repDate;
+        if (null != service)
+        {
+            repDate = service.Report_Date__c;
+        }
+        return(repDate);
+    }
+    
+    
+   /* *******************************************************************************
+    * @Author:		Darryl Ingalls
+    * @Date:		05/23/2018
+    * @Param:		None
+    * @Return:		String
+    * @Updated:		Natalie changed the code to return list of case strings as the requirement
+    * 				from having them display on one line changed to displaying them as bullet items.
+    * 
+    * ******************************************************************************/
+    public List<String> getPrivateSummaryString()
+    {
+        Map<String,List<integer>> summaryRecords = retrieveSummaryRecords(Summary_Case_Types.TYPE_PRIVATE);
+        if (0< summaryRecords.size())
+        {
+            Map<String, List<Integer>> openRecords = createMapForOpenCases(summaryRecords);
+        	//build the 2nd line open cases only.  PRD 2.c.ii
+			//OpenPrivateCases = buildSummaryString(openRecords).replace(NO_SUMMARY_AVAILABLE,NO_OPEN_CASES); 
+        }
+        List<String> results = buildSummaryString(summaryRecords);
+        if (results.size() < 1) results.add(NO_PRIVATE_CASES);
+		//return the summary string  PRD 2.a.i        
+        return(results);
+    }
+    
+   /* *******************************************************************************
+    * @Author:		Darryl Ingalls
+    * @Date:		05/23/2018
+    * @Param:		None
+    * @Return:		String
+    * @Updated:		Natalie changed the code to return list of case strings as the requirement
+    * 				from having them display on one line changed to displaying them as bullet items.
+    * 
+    * ******************************************************************************/
+    public List<String> getSemiPublicSummaryString()
+    {
+        Map<String,List<integer>> summaryRecords = retrieveSummaryRecords(Summary_Case_Types.TYPE_SEMIPUBLIC);
+        if (0 < summaryRecords.size()){
+            Map<String, List<Integer>> openRecords = createMapForOpenCases(summaryRecords);
+        	//build the 2nd line open cases only.  PRD 2.b.ii
+			//OpenSemiPublicCases = buildSummaryString(openRecords).replace(NO_SUMMARY_AVAILABLE,NO_OPEN_CASES); 
+    	}
+        List<String> results = buildSummaryString(summaryRecords);
+        if (results.size() < 1) results.add(NO_SEMI_CASES);
+		//return the summary string  PRD 2.a.i        
+        return(results);
+        
+    }
+    
+    Public Service__c getServiceInfo() {
+        
+            return(service);
+    }
+    
+    // Get related records and fields from child (lookup) cj_cycle__c object
+    // how to add dynamic service id in where clause?
+    // DMI this function was formerly known as getNotSealedCycle
+    Public List<CJ_Cycle__c> getPublicCases() {
+        
+        
+        List<CJ_Cycle__c> cases = [select cj.name,cj.type__c,cj.cycle__c, cj.this_case_is__c, cj.disposition_date__c,
+                cj.charge_level__c,cj.Charge_name__c,cj.will_be_sealed_on__c, cj.notes__c, cj.next_court_date__c,
+                cj.missing_unclear_dispositions__c, cj.disposition_note__c,cj.court_house__c,
+                cj.warrant__c,cj.warrant_notes__c,cj.charge_pl__c, cj.certificate_notes__c,
+                cj.certificate_eligibility_client_text__c, cj.Will_be_sealed__c 
+                from cj_cycle__c cj
+                //where cj.service__c='a05J0000000FiPo'
+                where cj.service__c = :svcRecID
+                and cj.type__c='Not Sealed' and cj.this_case_is__c!='an unsealed violation'
+                and cj.this_case_is__c!='an arrest only'
+                order by cj.cycle__c desc ];
+        	System.debug(' Public Cases Size: '+ cases.size());
+        return(cases);
+    }
+    
+    //This function was formerly known as getMaybeSealedCycled
+    Public List<CJ_Cycle__c> getPartialPublicCases() {
+        return [select cj.name,cj.type__c,cj.cycle__c, cj.this_case_is__c, cj.disposition_date__c,
+                cj.charge_level__c,cj.Charge_name__c,cj.will_be_sealed_on__c, cj.notes__c, 
+                cj.missing_unclear_dispositions__c, cj.disposition_note__c,cj.court_house__c,
+                cj.warrant__c,cj.warrant_notes__c,cj.charge_pl__c, cj.next_court_date__c,
+                cj.certificate_eligibility_client_text__c, cj.certificate_notes__c, cj.Will_be_sealed__c 
+                from cj_cycle__c cj
+                where cj.service__c = :svcRecID
+                and cj.type__c='Not Sealed' and (cj.this_case_is__c='an unsealed violation'
+                                                 or cj.this_case_is__c='an arrest only')
+                order by cj.cycle__c desc ];
+    }
+    
+    //This function was formerly known as getSealedCycle
+    Public List<CJ_Cycle__c> getPrivateCases() {
+        return [select cj.name,cj.type__c,cj.cycle__c, cj.this_case_is__c, cj.disposition_date__c,
+                cj.charge_level__c,cj.Charge_name__c,cj.will_be_sealed_on__c, cj.notes__c, 
+                cj.missing_unclear_dispositions__c, cj.disposition_note__c,cj.court_house__c,
+                cj.warrant__c,cj.warrant_notes__c,cj.charge_pl__c, cj.next_court_date__c,
+                cj.certificate_eligibility_client_text__c, cj.certificate_notes__c, cj.Will_be_sealed__c 
+                from cj_cycle__c cj
+                where cj.service__c = :svcRecID
+                and cj.type__c='Sealed'
+                order by cj.cycle__c desc ];
+    }
+    // They want warrant and certificates separately and maybe errors?
+    // Warrants
+    Public List<CJ_Cycle__c> getWarrants() {
+        return [select cj.name,cj.type__c,cj.cycle__c,cj.warrant__c,cj.warrant_notes__c,
+                cj.charge_pl__c,cj.Charge_name__c
+                from cj_cycle__c cj
+                where cj.service__c = :svcRecID
+                and cj.warrant__c='Yes'
+                order by cj.cycle__c ];
+    }
+    // Certificates
+    Public List<CJ_Cycle__c> getCertificates() {
+        return [select cj.name,cj.type__c,cj.cycle__c,cj.charge_pl__c,
+                cj.certificate_eligibility_client_text__c, cj.certificate_notes__c 
+                from cj_cycle__c cj
+                where cj.service__c = :svcRecID
+                and cj.certificate_eligibility_client_text__c>''
+                order by cj.cycle__c ];
+    }    
+    // Errors
+    Public List<CJ_Cycle__c> getErrors() {
+        return [select cj.name,cj.type__c,cj.cycle__c,cj.charge_pl__c,
+                cj.missing_unclear_dispositions__c, cj.disposition_note__c,cj.court_house__c
+                from cj_cycle__c cj
+                where cj.service__c = :svcRecID
+                and cj.missing_unclear_dispositions__c!='None' and cj.missing_unclear_dispositions__c!=''
+                order by cj.cycle__c ];
+    }
+    // Next Court Dates
+    Public List<CJ_Cycle__c> getNextCourtDates() {
+        return [select cj.name,cj.type__c,cj.cycle__c,
+                cj.next_court_date__c, cj.court_house__c
+                from cj_cycle__c cj
+                where cj.service__c = :svcRecID
+                and cj.next_court_date__c!=null
+                order by cj.next_court_date__c ];
+    }
+    
+    /* ******************************************************************************************
+    * @author:  	Darryl Ingalls
+    * @Date:		05/23/2018
+    * @Param:		enum Summary_Case_Types defines the type of case we need to pull summary records for 
+    * 				
+    * 				We have pre-defined constants that can be passed in for the value:
+    * 					TYPE_PUBLIC
+    * 					TYPE_SEMIPUBLIC
+    * 					TYPE_PRIVATE
+    * @Return:		List<CJ_Cycle__c> a list of cases that match the soql criteria.
+    * 
+    * ******************************************************************************************/
+    private Map<String,List<integer>> retrieveSummaryRecords(Summary_Case_Types caseType /*String viewabilityWhereClause*/)
+    {
+        List<CJ_Cycle__c> lstCycles;
+        if (Summary_Case_Types.TYPE_PUBLIC == caseType)
+        {
+            lstCycles = new List<CJ_Cycle__c>([SELECT  service__c, Certificate_Eligibility_Client_Text__c, this_case_is__c ,cycle__c, notes__c from cj_cycle__c WHERE this_case_is__c != null 
+                                                AND service__c = : svcRecID and type__c= 'Not Sealed' and this_case_is__c!= 'an unsealed violation' 
+                                                and this_case_is__c!= 'an arrest only' order by this_case_is__c, cycle__c]);
+        }
+        else if (Summary_Case_Types.TYPE_SEMIPUBLIC == caseType)
+        {
+            lstCycles = new List<CJ_Cycle__c>([SELECT  service__c, Certificate_Eligibility_Client_Text__c, this_case_is__c ,cycle__c, notes__c from cj_cycle__c WHERE this_case_is__c != null 
+                                                AND service__c = : svcRecID and type__c= 'Not Sealed' 
+                                                and (this_case_is__c= 'an unsealed violation' or this_case_is__c= 'an arrest only') order by this_case_is__c, cycle__c]);
+        }
+        else if (Summary_Case_Types.TYPE_PRIVATE == caseType )
+        {
+            lstCycles = new List<CJ_Cycle__c>([SELECT  service__c, Certificate_Eligibility_Client_Text__c, this_case_is__c ,cycle__c, notes__c from cj_cycle__c WHERE this_case_is__c != null 
+                                                AND service__c = : svcRecID and type__c = 'Sealed' order by this_case_is__c, cycle__c]);
+        }
+       /*
+        List<CJ_Cycle__c> lstCycles = database.query(PDF_SUMMARY_BASE_SOQL + svcRecID + viewabilityWhereClause + PDF_SUMMARY_ORDER_CLAUSE);*/
+        Map<String,List<integer>> summariesPerType = new Map<String, List<integer>>();
+        
+        for(CJ_Cycle__c cycle : lstCycles)
+        {
+            if (summariesPerType.containsKey(cycle.this_case_is__c))
+            {
+                List<integer> lstCase = summariesPertype.get(cycle.This_case_is__c);
+                lstCase.add((integer)cycle.Cycle__c);
+                summariesPerType.put(cycle.This_case_is__c,lstCase);
+            }
+            else
+            {
+                List<integer>newCases = new List<integer>();
+                newCases.add((integer)cycle.cycle__c);
+                summariesPerType.put(cycle.This_case_is__c,newCases);
+            }
+            
+            //If this is an open case then store it, cuz we'll need them late to show for notes.
+            if (OPEN_CASE == cycle.This_case_is__c)
+            {
+                allOpenCaseNotes.add(cycle);
+            }
+            
+            if (ELIGIBLE_CERTIFICATE == cycle.Certificate_Eligibility_Client_Text__c)
+            {
+                eligibleCertificateCases.add((integer) cycle.cycle__c);
+            }
+        }
+        return(summariesPerType);
+        
+    }
+    
+    /* *******************************************************************************
+    * @Author:		Darryl Ingalls
+    * @Date:		05/23/2018
+    * @Param:		Map<String,List<integer>> summaryRecords 
+    * @Return:		String
+    * 
+    * 				This function builds a summary string containing
+    * 				all Case types.
+    * ******************************************************************************/
+    private List<String> buildSummaryString(Map<String,List<integer>> summaryRecords)
+    {
+        String summaryString = '';
+        List<String> lstSumStrings = new List<String>();
+        if (0 < summaryRecords.size())
+        {
+            
+            for (String caseType : summaryRecords.keySet())
+            {
+                List<integer>lstCases = summaryRecords.get(caseType);
+                String tmpStr = removeFirstWordFromCaseString(caseType);
+                summaryString += lstCases.size() + ' ';
+                summaryString += (tmpStr == 'adjournment in contemplation of dismissal (ACD)') ? 'open ':''; 
+                summaryString += (1 < lstCases.size() ) ? PLURALLOOKUPSCASEDESCRIPTION.get(tmpStr ) : tmpStr;
+                summaryString += (1 < lstCases.size() ) ? ' (Cases #' : ' (Case #';
+                summaryString +=  buildListCasesString(lstCases) + ') ' ;
+                lstSumStrings.add(summaryString);
+                summaryString ='';//reset the string
+            }
+        }
+        return(lstSumStrings);
+    }
+    
+    private Map<String, List<Integer> > createMapForOpenCases(Map<String,List<Integer> >mapSource)
+    {
+        Map<String, List<Integer> > newMap = new Map<String, List<Integer>> ();
+        if (mapSource.containsKey(OPEN_CASE))
+        {
+            newMap.put(OPEN_CASE,new List<Integer> (mapSource.get(OPEN_CASE) ));
+        }
+        return(newMap);
+    }
+    /* *****************************************************************************
+     * @Author:		Darryl Ingalls
+     * @Date:		05/24/2018
+     * @Param:		List<integer> lstCases
+     * @Return:		String
+     * 
+     * *****************************************************************************/
+    private String buildListCasesString(List<integer> lstCases)
+    {
+        String tmpStr='';
+        //This next part could be broken down to another function in the optimizing
+        //phase of this project.  It would return the case #'s built with, and 'and'
+        for(integer caseCnt = 0; caseCnt < lstCases.size(); caseCnt++)
+        {
+            if ( (0 < caseCnt ) && (caseCnt < (lstCases.size()-1) ) )
+            {
+                tmpStr += ', ';
+            }
+            else if( (0 < caseCnt) && (caseCnt == (lstCases.size()-1) ))
+            {
+                tmpStr += ' and ';    
+            }
+            
+            tmpStr +=   (integer)lstCases[caseCnt];
+        }
+        
+        return(tmpStr);
+    }
+    
+    /* ****************************************************************
+     * @Author:		Darryl Ingalls
+     * @Date:		05/24/2018
+     * @Param:		String toBeCleaned
+     * @Return:		String
+     *  
+     * ****************************************************************/
+    private String removeFirstWordFromCaseString(String toBeCleaned)
+    {
+        //Remove the unnecessary words in the beginning of the string.
+        String newString = toBeCleaned;
+        for(String wordToRemove : EXCLUDES)
+        {
+            newString =  newString.removeStartIgnoreCase(wordToRemove);
+        }
+        
+        return(newString);
+    }
+    
+}

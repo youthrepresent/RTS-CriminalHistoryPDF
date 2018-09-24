@@ -1,0 +1,464 @@
+<apex:page Controller="CrimHistoryPDF_Ctrlr"  showHeader="false" applyBodyTag="false" standardStylesheets="false" renderAs="pdf">
+    <apex:stylesheet value="{!$Resource.mainServiceGeneratePDF}" html-media="print"/>
+    <apex:stylesheet value="{!$Resource.pagesServiceGeneratePDF}" html-media="print"/> 
+    
+    <head>
+        <style>
+   		
+        .case-info {          
+          margin: 50px 0 40px 24px;
+          padding: 0 15px 0 30px;
+          width: 252px;
+          list-style-type: none;
+        }
+        .test {
+        	margin-top: -5px;    
+        }
+        .nested-list-indented {
+            padding-left: 15px;
+         }
+        .hide-item {display:none;}
+            .error-note {position:relative; height:14px; top:2px;}
+        </style>        
+    </head>
+    <div>    
+        <!-- HEADER -->
+        <div class="header-left gray-text">            
+            <span class="uppercase">Your Youth Represent Attorney is&nbsp;
+            	<apex:outputText value="{!attorneyInfo.Name}"></apex:outputText>
+            </span> 
+            <apex:outputText value="{!attorneyInfo.Email}"></apex:outputText>
+            <apex:outputText value="{!attorneyInfo.Phone}"></apex:outputText>                                                   
+        </div>
+        <div class="header-right gray-text">
+            <span class="uppercase">Do not show this report to anyone.</span>
+            <span class="uppercase">Keep it in a safe place.</span>
+            <span>Attorney-Client Privileged Information</span>            
+        </div>
+        <!-- FOOTER -->
+        <div class="footer-left gray-text">            
+            <span class="uppercase">This report for {!ClientInitials} is accurate as of: </span>
+            
+             <apex:outputText value="{0,date,MM'/'dd'/'yyyy}">
+                 <apex:param value="{!ReportDate}" /> 
+            </apex:outputText>
+            <br> <span id="pageNum"/> </br> 
+            
+        </div>
+		<div class="footer-right">
+            <apex:image url="{!$Resource.yrLogo}" width="150" height="40"/>
+        </div>    
+        <!-- PAGE 1 -->
+        <div style="page-break-after:always;">
+            <apex:image url="{!$Resource.reportShowsBanner}" width="735"/>
+            <p class="disclaimer">
+                <strong>It does not include cases from other states, federal cases, or summonses</strong>
+            </p> 
+            <apex:image url="{!$Resource.whatShowsUpBanner}" width="730" styleClass="mt-25px"/>                        
+            <div class="case-types-overview">
+                <apex:image url="{!$Resource.pubPrivateWarning}" width="730"/>
+                <p class="txt-wrapper align-to-top">              
+	                <strong class="case-visible-text">These will show up.</strong>
+                </p>                
+                <p class="txt-wrapper">           
+	                <strong>
+                        <span>These should not show up. </span>                     
+                        <span class="red-text">Think your private cases are showing up?</span>
+                        <span class="red-text">Contact your attorney right away.</span>
+                    </strong>
+                </p>                
+                <apex:image url="{!$Resource.semiPublicBanner}" width="295" styleClass="semi-pub-banner"/>
+                <p class="txt-wrapper">              
+	                <strong class="case-visible-text">These might show up.</strong>
+                </p>
+            </div>
+            <apex:image url="{!$Resource.whoCanAskBanner}" width="730" styleClass="mt-25px"/>
+            <div class="who-can-callouts ml-40px">
+                <div class="align-to-top test">
+                    <apex:image url="{!$Resource.locationIconStyled}" width="75" styleClass="test"/>
+                    <p class="dsply-ib">
+                        <strong>Landlords <span class="uppercase">are allowed</span> to ask you about your record and run background checks.</strong>
+	                    <strong class="dsply-blk">But they are <span class="uppercase">only allowed</span> to see your public cases.</strong>
+                    </p>                   
+                </div>
+                <div>
+                	<apex:image url="{!$Resource.hatIconStyled}" width="75"/>
+                    <p class="dsply-ib">
+                        <strong>Schools you are applying to <span class="uppercase">are allowed</span> to ask you about your record and run</strong>
+	                    <strong class="dsply-blk">background checks. But most schools are <span class="uppercase">only allowed </span>to see your public cases.</strong>
+                    </p> 
+                </div>    
+                <div>
+                	<apex:image url="{!$Resource.bagIconStyled}" width="75"/>
+                    <p class="dsply-ib">
+                        <strong>Most employers in New York City <span class="uppercase">are not allowed</span> to ask you questions about your</strong>
+	                    <strong class="dsply-blk">record until after they make you a job offer.</strong>
+                    </p>                                  	
+                </div>
+                <p>
+                    <strong class="list-header"><span class="uppercase">But, </span>there are employers who <span class="uppercase">are allowed</span> to ask you about your record:</strong>
+                    <ul class="bold employer-types">
+                        <li>Law Enforcement (for example, if you apply to be a police officer)</li>
+                        <li>Federal government employers (for example, the Post Office)</li>
+                        <li>Employers outside of New York City</li>
+                    </ul>
+                    <strong class="red-text list-header">Contact your attorney right away if:</strong>
+                    <ul class="bold red-text contact-if">
+                        <li>You have been asked about your criminal record before being offered a job.</li>
+                        <li>You are applying for a job as a police officer, corrections officer, or in the military.</li>
+                        <li>You have ever been fingerprinted for a job or are expecting to be.</li>
+                    </ul>
+                </p>  
+            </div>
+        </div>
+        <!-- PAGE 2 -->
+        <div class="page2" style="page-break-after:always;">                        
+            <apex:image url="{!$Resource.summaryRecoBanner}" width="730" styleClass="mt-15px"/>
+            <div class="case-types-summary ml-40px">
+                <apex:image url="{!$Resource.public_semiPublicBanner}" height="45"/>
+                <ul class="bold dsply-ib align-to-top">
+                    <apex:repeat value="{!PublicSummaryString}" var="pubString">
+                    	<li> {! pubString } </li>
+                    </apex:repeat>
+                </ul>         
+               
+                <ul class="bold dsply-ib align-to-top pl-60px">
+                    <apex:repeat value="{!SemiPublicSummaryString}" var="parString">
+                    	<li> {! parString } </li>
+                    </apex:repeat>
+                </ul>
+                <apex:image url="{!$Resource.privateTodosBanner}" height="54"/>
+               	<ul class="bold dsply-ib align-to-top">
+                    <apex:repeat value="{!PrivateSummaryString}" var="pvtString">
+                    	<li> {! pvtString } </li>
+                    </apex:repeat>
+                </ul>
+               	<ul class="bold dsply-ib align-to-top pl-60px">                    
+                    <li class="{! IF( warrants.size > 0 , ' ', 'hide-item')}">
+                        Warrants
+                         <apex:repeat value="{!Warrants}" var="warrant">
+                                 <li class="nested-list-indented"> Case #{!FLOOR(warrant.cycle__c)} - {!warrant.Charge_Name__c}</li>
+                        </apex:repeat>
+                                    
+                    </li>
+                    <li class="{! IF( errors.size > 0 , ' ', 'hide-item')}">
+                        Possible Errors
+                        <apex:repeat value="{!Errors}" var="error">
+                            <li class="nested-list-indented">Case #{!FLOOR(error.Cycle__c)} - {!error.Disposition_Note__c} </li> 
+                        </apex:repeat>   
+                        
+                    </li>
+                    <li class="{! IF( NextCourtDates.size > 0 , ' ', 'hide-item')}">
+                         Next Court Date
+                        <apex:repeat value="{!NextCourtDates}" var="case">
+                            <li class="nested-list-indented">
+                                {!case.Next_Court_Date__c}
+                                <apex:outputText value=" (Case #{0})"> 
+                                     <apex:param value="{!case.Cycle__c}" />
+                                </apex:outputText>
+                            </li>
+                        </apex:repeat>
+                                                                      
+                    </li>                    
+                    <li class="{! IF( EligibleCertificateCases.size > 0 , ' ', 'hide-item')}">
+                        Certificates
+                            <li class="nested-list-indented" style="list-style:none;">
+                                You are eligible for a Certificate of Relief from Disabilities in the following cases:
+                                <apex:repeat value="{! EligibleCertificateCases }" var="case">
+                                	<li class="nested-list-indented ml-30px">
+                                        <apex:outputText value="Case #{!case}"/>
+                                    </li>
+                                </apex:repeat>
+                    		</li>
+                    </li>                 
+                    <li>
+                    	 Don't share private information about any of your private cases with employers, landlords,
+                         or schools. If any of these cases show up in a background check, call your lawyer
+                         {!attorneyInfo.Name} immediately.
+                    </li>
+                </ul>   
+            </div>			
+        </div>
+        <!-- PAGE 3 PUBLIC CASES -->
+        <div style="page-break-after:always; page-break-inside:avoid;" class="{! IF( PublicCases.size > 0 , ' ', 'hide-item')}">
+            <apex:image url="{!$Resource.yourPublicCasesBanner}" width="730" styleClass="mt-15px"/>
+             <p class="disclaimer">
+                <strong>These cases will show up when someone runs a background check on you. Some public cases can be sealed after ten years. Talk to your lawyer, {! AttorneyInfo.Name }, to find out whether your cases can be sealed.</strong>
+            </p>
+            <div class="cases-container ml-30px">
+                <apex:repeat value="{!PublicCases}" var="pubCase"> 
+                	<div class="case align-to-top">
+            			<apex:image url="{!$Resource.warningIcon}" styleClass="{! IF( pubCase.missing_unclear_dispositions__c != 'None' || pubCase.This_case_is__c == 'an open case' || pubCase.This_case_is__c == 'an adjournment in contemplation of dismissal (ACD)', 'warning-icon', 'warning-icon hidden')}"/>
+                        <span class="case-number bold">Case #{!FLOOR(pubCase.cycle__c)}</span>
+                        <apex:image url="{!$Resource.caseBubbleTop}" width="330" styleClass="case-bubble-top"/>
+                        <!--render if case has any associated alerts -->
+                        <ul class="case-info public">
+                            <li>
+                                <strong>This case is: </strong>
+                                <apex:outputText value="{! IF(pubCase.This_case_is__c == 'an adjournment in contemplation of dismissal (ACD)', pubCase.This_case_is__c + ' that is still open', pubCase.This_case_is__c)}"/>
+                            </li>                 
+                            <li>
+                                <strong>Charge: </strong>
+                                <apex:outputText value="{!pubCase.Charge_Name__c}"/>
+                            </li>                 
+                            <li>
+                                <strong>Level: </strong> 
+                                <apex:outputText value="{!pubCase.Charge_Level__c}"/>
+                            </li>
+                            <li class="{! IF( !ISBLANK(pubCase.Disposition_Date__c), ' ', 'hide-item')}">
+                                <strong>Disposition Date: </strong>
+                                <apex:outputText value="{0,date,MM'/'dd'/'yyyy}">
+                                    <apex:param value="{!pubCase.Disposition_Date__c}" /> 
+                                </apex:outputText>                                    
+                            </li>
+                            <li>
+                                <strong>When will this case be sealed? </strong>
+                                <apex:outputText value="{! IF( pubCase.Will_be_sealed_on__c == '' , 'This case is not scheduled to be sealed.', pubCase.Will_be_sealed_on__c)}"/>
+                            </li>
+                            <li>
+                                <strong>Are you eligible for a certificate of relief from disabilities? </strong>
+                                <apex:outputText value="{! IF( CONTAINS(pubCase.Certificate_Eligibility_Client_Text__c,'Unknown') , 'You may be eligible for a Certificate of Relief for Good Conduct.  Please talk to your lawyer about it.', pubCase.Certificate_Eligibility_Client_Text__c)}"/>
+                            </li>
+                            <li class="{! IF( !ISBLANK(pubCase.Next_Court_Date__c) && (pubCase.missing_unclear_dispositions__c == 'None') && (pubCase.This_case_is__c != 'an open case') , ' ', 'hide-item')}">
+                                <strong>Your next court date is: </strong>
+                                {!pubCase.Next_Court_Date__c}                                 
+                            </li>
+                            <li style="margin-top:5px" class="{! IF( pubCase.missing_unclear_dispositions__c != 'None' || pubCase.This_case_is__c == 'an open case' || pubCase.This_case_is__c == 'an adjournment in contemplation of dismissal (ACD)' ,  ' ','hide-item')}">
+                                <apex:image url="{!$Resource.error_note}" styleClass="error-note" />
+                            	<apex:outputText value="{! IF( pubCase.This_case_is__c == 'an open case' , 'Your next court date is ' + pubCase.Next_Court_Date__c,'This case will appear as open until it seals automatically on ' + pubCase.Will_be_sealed_on__c )}"/>
+                            </li>
+                        </ul>
+                        <apex:image url="{!$Resource.caseBubbleBottom}" width="320px" styleClass="case-bubble-bottom"/>
+                    </div>   
+                </apex:repeat>                                                                                                       
+            </div>
+    	</div>
+        <!-- PAGE 4 SEMI PUBLIC CASES -->
+        <div style="page-break-after:always; page-break-inside:avoid;" class="{! IF( PartialPublicCases.size > 0 , ' ', 'hide-item')}">
+    		<apex:image url="{!$Resource.yourSemiPublicCasesBanner}" width="730" styleClass="mt-15px"/>
+            <!--render if case has any associated alerts -->
+            <!--apex:image url="{!$Resource.caseBubbleTopAlert}" width="347" styleClass="case-bubble-top-alert"/-->
+            <div class="disclaimer">
+                <ul class="bold">
+                   <li>
+                       <span>These cases cannot be seen by most employers. They MIGHT show up if you are</span> 
+                       <br/>
+                       <span>fingerprinted for a background check, for example if you apply to work as a security</span>
+                       <br/>
+                       <span>guard or home health aide.</span>
+                   </li> 
+                   <li>If these cases are errors, they will no longer be seen once they are corrected.</li> 
+                   <li>If these cases are scheduled to be sealed, they will be private as soon as they are sealed.</li> 
+            	</ul>
+            </div>
+            <div class="cases-container ml-30px">
+                <apex:repeat value="{!PartialPublicCases}" var="parCase"> 
+                	<div class="case">
+            			<apex:image url="{!$Resource.warningIcon}" styleClass="{! IF( parCase.missing_unclear_dispositions__c != 'None' , 'warning-icon', 'warning-icon hidden')}"/>
+                        <span class="case-number bold">Case #{!FLOOR(parCase.cycle__c)}</span>
+                        <apex:image url="{!$Resource.caseBubbleTop}" width="331" styleClass="case-bubble-top"/>
+                        <ul class="case-info semi">
+                            <li>
+                                <strong>This case is: </strong>
+                                <apex:outputText value="{!parCase.This_case_is__c}"/>
+                            </li>                 
+                            <li>
+                                <strong>Charge: </strong>
+                                <apex:outputText value="{!parCase.Charge_Name__c}"/>
+                            </li>                 
+                            <li>
+                                <strong>Level: </strong> 
+                                <apex:outputText value="{!parCase.Charge_Level__c}"/>
+                            </li>
+                            <li class="{! IF( !ISBLANK(parCase.Disposition_Date__c), ' ', 'hide-item')}">
+                                <strong>Disposition Date: </strong>
+                                <apex:outputText value="{0,date,MM'/'dd'/'yyyy}">
+                                    <apex:param value="{!parCase.Disposition_Date__c}" /> 
+                                </apex:outputText>                                    
+                            </li>
+                            <li>
+                                <strong>When will this case be sealed? </strong>
+                                <apex:outputText value="{! IF( parCase.Will_be_sealed_on__c == '' , 'This case will not seal automatically.', parCase.Will_be_sealed_on__c)}"/>
+                            </li>
+                            <li>
+                                <strong>Are you eligible for a certificate of relief from disabilities? </strong>
+                                <apex:outputText value="{! IF( CONTAINS(parCase.Certificate_Eligibility_Client_Text__c,'Unknown') , 
+                                                        'You may be eligible for a Certificate of Relief for Good Conduct.  Please talk to your lawyer about it.', parCase.Certificate_Eligibility_Client_Text__c)}"/>
+
+                            </li>
+                            <li class="{! IF( !ISBLANK(parCase.Next_Court_Date__c), ' ', 'hide-item')}">
+                                <strong>Your next court date is: </strong>
+                                {!parCase.Next_Court_Date__c}                                 
+                            </li>
+                            <li style="margin-top:5px" class="{! IF( parCase.missing_unclear_dispositions__c == 'None' , 'hide-item', ' ')}">
+                                <apex:image url="{!$Resource.error_note}" styleClass="error-note" />
+                            	<apex:outputText value="{! IF( parCase.disposition_note__c != '' , parCase.disposition_note__c, 'Youth Represent is investigating.')}"/>
+                            </li>
+                        </ul>
+                        <apex:image url="{!$Resource.caseBubbleBottom}" width="330" styleClass="case-bubble-bottom"/>
+                    </div>   
+                </apex:repeat>                                                                                                       
+            </div>
+    	</div>
+        <!-- PAGE 5 PRIVATE CASES -->  
+        <div style="page-break-after:always; page-break-inside:avoid;" class="{! IF( PrivateCases.size > 0 , ' ', 'hide-item')}">
+            <apex:image url="{!$Resource.yourPrivateCasesBanner}" width="730" styleClass="mt-15px"/>
+            <!--render if case has any associated alerts -->
+            <!--apex:image url="{!$Resource.caseBubbleTopAlert}" width="347" styleClass="case-bubble-top-alert"/-->
+            <p class="disclaimer">
+                <strong>This information will <span class="uppercase">not</span> show up on most background checks. 
+                    If any of these cases do show up on a background check, call your lawyer Jessie Workman right away.</strong>
+            </p>
+            <div class="cases-container ml-30px">
+                <apex:repeat value="{!PrivateCases}" var="pvtCase"> 
+                	<div class="case">
+                        <span class="case-number bold">Case #{!FLOOR(pvtCase.cycle__c)}</span>
+                        <apex:image url="{!$Resource.caseBubbleTop}" width="330" styleClass="case-bubble-top"/>
+                        <ul class="case-info private">
+                            <li>
+                                <strong>This case is: </strong>
+                                <apex:outputText value="{!pvtCase.This_case_is__c}"/>
+                            </li>                 
+                            <li>
+                                <strong>Charge: </strong>
+                                <apex:outputText value="{!pvtCase.Charge_Name__c}"/>
+                            </li>                 
+                            <li>
+                                <strong>Level: </strong> 
+                                <apex:outputText value="{!pvtCase.Charge_Level__c}"/>
+                            </li>
+                            <li class="{! IF( !ISBLANK(pvtCase.Disposition_Date__c), ' ', 'hide-item')}">
+                                <strong>Disposition date: </strong>
+                                <apex:outputText value="{0,date,MM'/'dd'/'yyyy}">
+                                    <apex:param value="{!pvtCase.Disposition_Date__c}" /> 
+                                </apex:outputText>                                    
+                            </li>
+                            <li>
+                            	<strong>This case is sealed.</strong> {! pvtCase.notes__c }
+                            </li>
+                            <li style="margin-top:5px" class="{! IF( pvtCase.missing_unclear_dispositions__c == 'None' , 'hide-item', ' ')}">
+                                <apex:image url="{!$Resource.error_note}" styleClass="error-note" />
+                            	<apex:outputText value="{! IF( pvtCase.disposition_note__c != '' , pvtCase.disposition_note__c, 'Youth Represent is investigating.')}"/>
+                            </li>
+                        </ul>
+                        <apex:image url="{!$Resource.caseBubbleBottom}" width="331" styleClass="case-bubble-bottom"/>
+                    </div>   
+                </apex:repeat>                                                                                                       
+            </div>            
+        </div>              	     
+        <!-- PAGE 6 VOCAB -->
+        <div style="page-break-after:always;">
+        	<apex:image url="{!$Resource.vocabularyBanner}" width="730" styleClass="mt-15px"/>
+			<apex:image url="{!$Resource.vocabPublic}" width="730"/>
+			<p class="definition bold">
+                Public means an employer running a background check has access to this information.                                
+            </p>                  
+            <apex:image url="{!$Resource.vocabPrivateConfidential}" width="730"/>
+			<p class="definition bold"> 
+                Private and Confidential both mean that most of the time this information will NOT show up in a 
+                <br/>
+                background check. But some employers and government agencies have access to this information. 
+                <br/>
+                Examples include courts, police, banks (if you apply for a job in the finanical industry), the military, 
+                <br/>
+                and immigration agents. If you are arrested again, you lawyer will probably see this information.
+            </p>           
+            <apex:image url="{!$Resource.vocabAdjction }" width="730"/>
+			<p class="definition bold">
+                A formal finding issued by the court after a hearing. Juvenile delinzuencies and youthful 
+                <br/>
+                offender findings are considered adjudications. Adjudications are not convictions.
+            </p>     
+            <apex:image url="{!$Resource.vocabArrest}" width="730"/>
+			<p class="definition bold">
+                Being detained, processed and charged with committing an offence or crime.
+            </p>     
+            <apex:image url="{!$Resource.vocabConviction}" width="730"/>
+			<p class="definition bold">
+                When a judge finds a pereson guilty of a crime or offense, or a person pleads guilty to a crime or offense.
+            </p>     
+            <apex:image url="{!$Resource.vocabCrime}" width="730"/>
+			<p class="definition bold">
+                A felony or misdemeanor offense. A violation is an offense, not a crime.
+            </p>     
+            <apex:image url="{!$Resource.vocabDispo}" width="730"/>
+			<p class="definition bold">
+                An official leagal term for how the case ended,
+            </p>     
+            <apex:image url="{!$Resource.vocabDispoCert}" width="730"/>
+			<p class="definition bold">
+                A paper frrom the Court that shows how the case ended.
+            </p>     
+            <apex:image url="{!$Resource.vocabReliefCert}" width="730"/>
+			<p class="definition bold">
+                A Certificate of Relief (COR) is a certificate granted by a judge or Parole that can be used to
+                <br/>
+                overcome barriers to getting certain jobs and licenses, like a security guard license. There may be
+                <br/>
+                a waiting period required to apply, depending on how many felony convictions you have. 
+            </p>     
+		</div>
+        <!-- PAGE 7 -->
+        <div>
+			<apex:image url="{!$Resource.vocabCaseOutcomes}" width="730" styleClass="mt-15px"/>
+			<p class="definition bold">
+                Every single case must have an official outcome, also called a disposition. The outcome can 
+                <br/>
+                be anything from a dismissal, where all charges are dropped and the case is sealed, to a
+                <br/>
+                conviction for a felony. Here are some of the most common outcomes:                       
+            </p>
+            <apex:image url="{!$Resource.vocabACD}" width="730"/>
+			<p class="definition detail bold">
+                ACD stands for Adjournment in Contemplation of Dismissal. This case is kept open for
+                <br/>
+                a period of time, usually 6 months or a year. If the person is not re-arrested during 
+                <br/>
+                that time, the case is automatically dropped.                     
+            </p>
+            <apex:image url="{!$Resource.vocabDismissal}" width="730"/>
+			<p class="definition detail bold">
+                All charges in the case are dropped and all information about the case is sealed.                           
+            </p> 
+            <apex:image url="{!$Resource.vocabYouthOffdr}" width="730"/>
+			<p class="definition detail bold">
+                Youthful Offender (YO) is a special status granted by a judge to a young person 
+                <br/> 
+                under 19-years-old. Youthful offender adjudications are not considered convictions.
+                <br/>
+                This means that they ar private from most employers, but will be seen by law
+                <br/>
+                enforcement and your attorney if you are arrested again.
+            </p>
+            <apex:image url="{!$Resource.vocabCrimCovtn}" width="730"/>
+			<p class="definition detail bold">
+                A finding, either by plea or being found guilty, of a Felony or Misdemeanor.                         
+            </p> 
+            <apex:image url="{!$Resource.vocabViolation}" width="730"/>
+            <p class="definition detail bold">
+                A conviction for an "offense," but not a crime. Most but not all violations are
+                <br/> 
+                automatically sealed at the end of a sentence. Often the sentence is a one-year
+                <br/>
+                conditional discharge, so the conviction seals after that one year.
+            </p>
+            <apex:image url="{!$Resource.vocabMisdmnr}" width="730"/>
+            <p class="definition detail bold">
+                A lower-level crime. The maximum sentence for a misdemeanor is one year in jail/ 
+                <br/> 
+               	prison or up to 3 years Probation. Some misdemeanors can be sealed after years. As
+                <br/>
+                long as they are not sealed, they will appear on a rap sheet requested by an employer.                
+            </p>
+            <apex:image url="{!$Resource.vocabFelony}" width="730"/>
+            <p class="definition detail bold">
+                A more serious crime. All felonies carry a possible sentence of at least one year in
+                <br/> 
+                prison or up to 3 years of Probation. Some misdemeanors can be sealed after years. As
+                <br/>
+                long as they are not sealed, they will appear on a rap sheet requested by an employer.
+                <br/>
+            </p>
+		</div>        	       
+    </div>        
+</apex:page>
