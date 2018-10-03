@@ -1,4 +1,4 @@
-<apex:page Controller="CrimHistoryPDF_Ctrlr"  showHeader="false" applyBodyTag="false" standardStylesheets="false" renderAs="pdf">
+<apex:page Controller="CrimHistoryPDF_Ctrlr"  showHeader="false" applyBodyTag="false" standardStylesheets="false" renderAs="PDF">
     <apex:stylesheet value="{!$Resource.mainServiceGeneratePDF}" html-media="print"/>
     <apex:stylesheet value="{!$Resource.pagesServiceGeneratePDF}" html-media="print"/> 
     
@@ -27,7 +27,7 @@
             <span class="uppercase">Your Youth Represent Attorney is&nbsp;
             	<apex:outputText value="{!attorneyInfo.Name}"></apex:outputText>
             </span> 
-            <apex:outputText value="{!attorneyInfo.Email}"></apex:outputText>
+            <apex:outputText value="{!attorneyInfo.Email + ' '}"></apex:outputText>
             <apex:outputText value="{!attorneyInfo.Phone}"></apex:outputText>                                                   
         </div>
         <div class="header-right gray-text">
@@ -162,7 +162,7 @@
                     </li>                    
                     <li class="{! IF( EligibleCertificateCases.size > 0 , ' ', 'hide-item')}">
                         Certificates
-                            <li class="nested-list-indented" style="list-style:none;">
+                            <li class="{! IF( EligibleCertificateCases.size > 0 , 'nested-list-indented', 'hide-item')} style="list-style:none;">
                                 You are eligible for a Certificate of Relief from Disabilities in the following cases:
                                 <apex:repeat value="{! EligibleCertificateCases }" var="case">
                                 	<li class="nested-list-indented ml-30px">
@@ -171,10 +171,13 @@
                                 </apex:repeat>
                     		</li>
                     </li>                 
-                    <li>
+                    <li class="{! IF( PrivateCases.size > 0 , ' ', 'hide-item')}">
                     	 Don't share private information about any of your private cases with employers, landlords,
                          or schools. If any of these cases show up in a background check, call your lawyer
                          {!attorneyInfo.Name} immediately.
+                    </li>
+                    <li class="{! IF( warrants.size <= 0 && errors.size <= 0 && NextCourtDates.size <= 0 && EligibleCertificateCases.size <= 0 && PrivateCases.size <= 0 , ' ', 'hide-item')}">
+                    	 You have no to-do items.
                     </li>
                 </ul>   
             </div>			
